@@ -125,10 +125,10 @@ def add_series_group(hdf_file, time_file):
         hdf_file.attrs.create('timeRecordInterval', intervalInSeconds, dtype=numpy.int64)
 
         x_dataset = numpy.empty((1, 1), dtype=numpy.float64)
-        x_dataset[0][0] = time_file.longitude
+        x_dataset[0,0] = time_file.longitude
 
         y_dataset = numpy.empty((1, 1), dtype=numpy.float64)
-        y_dataset[0][0] = time_file.latitude
+        y_dataset[0,0] = time_file.latitude
 
         #Add the 'Group XY' to store the position information.
         xy_group = hdf_file.create_group('Group XY')
@@ -219,15 +219,15 @@ def add_series_datasets(group, time_file):
 
         #Read the data from the ascii file and store it in the HDF5 dataset.
         data_values = time_file.read_next_row()
-        directions[0][row_counter] = data_values[1]
-        speeds[0][row_counter] = data_values[2] * ms2Knots
+        directions[0,row_counter] = data_values[1]
+        speeds[0,row_counter] = data_values[2] * ms2Knots
 
         #Find the min/max speed values.
         if min_speed == None:
-            min_speed = max_speed = speeds[0][row_counter]
+            min_speed = max_speed = speeds[0,row_counter]
         else:
-            min_speed = min(min_speed, speeds[0][row_counter])
-            max_speed = max(max_speed, speeds[0][row_counter])
+            min_speed = min(min_speed, speeds[0,row_counter])
+            max_speed = max(max_speed, speeds[0,row_counter])
 
 
     #Create a new dataset.

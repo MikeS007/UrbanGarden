@@ -1,5 +1,6 @@
 #******************************************************************************
-# This file is slightly different from the original as we added in a station name and id to the meta data 
+# This file is slightly different from the original as we added in a station name and id to the meta data
+# We may want to ask Louis if we want additional meta data  
 #******************************************************************************
 import argparse
 import sys

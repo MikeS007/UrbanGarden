@@ -1,5 +1,5 @@
 #******************************************************************************
-# Mike added a comment here to test a commit to dev2
+# This file is slightly different from the original as we added in a station name and id to the meta data 
 #******************************************************************************
 import argparse
 import sys

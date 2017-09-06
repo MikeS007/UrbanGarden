@@ -12,6 +12,8 @@ from chs_s111 import ascii_time_series
 ms2Knots = 1.943844
 
 #******************************************************************************
+#Update the area coverage information. (These are not set anymore, since 1.09)
+#update_area_coverage(hdf_file, time_file.latitude, time_file.longitude)
 def update_area_coverage(hdf_file, latitude, longitude):
     """Update the geographic extents of the S-111 file.
     

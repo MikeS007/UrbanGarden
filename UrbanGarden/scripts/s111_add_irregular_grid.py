@@ -42,8 +42,8 @@ def create_xy_group(hdf_file, latc, lonc):
             minY = min(minY, latitude)
             maxY = max(maxY, latitude)
 
-        xCoordinates[0][index] = longitude
-        yCoordinates[0][index] = latitude
+        xCoordinates[0,index] = longitude
+        yCoordinates[0,index] = latitude
 
 
     #Add the 'Group XY' to store the position information.
@@ -93,8 +93,8 @@ def create_direction_speed(group, ua, va):
         if windDirectionNorth < 0.0:
             windDirectionNorth += 360.0
 
-        directions[0][index] = windDirectionNorth
-        speeds[0][index] = windSpeed
+        directions[0,index] = windDirectionNorth
+        speeds[0,index] = windSpeed
 
         if min_speed == None:
             min_speed = max_speed = windSpeed

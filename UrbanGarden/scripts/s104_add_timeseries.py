@@ -8,6 +8,7 @@ import numpy
 import iso8601
 import pytz
 import ascii_time_series_wl
+import GetWLDerivativeFlag
 
 ms2Knots = 1.943844
 
@@ -201,7 +202,11 @@ def add_series_group(hdf_file, time_file):
 
 #******************************************************************************    
 def add_series_datasets(group, time_file):
-    """Add the timeseries data to the specified HDF group.
+    """
+    Add the timeseries data to the specified HDF group.
+    Trends: in order to run the trend method, we need the previous 2 values 
+    and the next 2 values surrounding the current water level point 
+    The values should be 15 minutes apart 
     
     :param group: The HDF group to add the waterlevel dataset to.
     :param time_file: The input ASCII file containing the timeseries data.
@@ -217,18 +222,20 @@ def add_series_datasets(group, time_file):
     # or number of dimensions, ndim.
     # Code below creates an array with one row and number_of_records columns 
     waterlevels =  numpy.empty((1, time_file.number_of_records), dtype=numpy.float64)
+    trend =  numpy.empty((1, time_file.number_of_records), dtype=numpy.float64)
 
     print("Adding water level information...")
 
     #For each row of data in the ascii file...
     for row_counter in range(0, time_file.number_of_records):
 
-        #Read the data from the ascii file and store it in the HDF5 dataset.
+        # Read the data from the ascii file and store it in the HDF5 dataset.
         # Remember this is a tuple containing A tuple containing the date, waterlevel (m).
         data_values = time_file.read_next_row()
         waterlevels[0,row_counter] = data_values[1]
 
-        #Find the min/max speed values.
+        # Find the min/max water level values.
+        # NOTE: Should discuss if we need these for water levels 
         # In this case min and max compare the 2 values 
         if min_waterlevel == None:
             min_waterlevel = max_waterlevel = waterlevels[0,row_counter]
@@ -236,8 +243,28 @@ def add_series_datasets(group, time_file):
             min_waterlevel = min(min_waterlevel, waterlevels[0,row_counter])
             max_waterlevel = max(max_waterlevel, waterlevels[0,row_counter])
 
+ 
+    print("Trend is starting ..")
+    # Loop through the water level array and add in a trend 
+    for x in range(0, time_file.number_of_records):
+        # Only calculate when we have 2 previous and 2 future values 
+        # from the current water level point 
+        if x > 1 and x < (time_file.number_of_records-2):
+            p2 = waterlevels[0,x-2]
+            p1 = waterlevels[0,x-1]
+            curr = waterlevels[0,x]
+            n1 = waterlevels[0,x+1]
+            n2 = waterlevels[0,x+2]
+            waterlevellist = [p2,p1,curr,n1,n2]
+            trend[0,x]  = GetWLDerivativeFlag.GetWLDerivativeFlag(waterlevellist)            
+        else:
+            # Trend is unknown
+            print("Trend is unknown...")
+            trend[0,x] = 3
+ 
     #Create a new dataset.
     group.create_dataset('WaterLevel', (1, time_file.number_of_records), dtype=numpy.float64, data=waterlevels)
+    group.create_dataset('Trend', (1, time_file.number_of_records), dtype=numpy.float64, data=trend)
 
     return (min_waterlevel, max_waterlevel)
     

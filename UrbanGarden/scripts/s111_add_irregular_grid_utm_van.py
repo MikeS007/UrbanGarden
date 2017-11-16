@@ -12,6 +12,10 @@ import utm
 
 ms2Knots = 1.943844
 
+# Offsets 
+dx = 4.2e5
+dy = 5.4e6
+
 #******************************************************************************        
 def create_xy_group(hdf_file, latc, lonc):
     """ Create the XY group containing the position information.
@@ -25,16 +29,29 @@ def create_xy_group(hdf_file, latc, lonc):
     numberOfLat = latc.shape[0]
     numberOfLon = lonc.shape[0]
 
-    xCoordinates =  numpy.empty((1, numberOfLat), dtype=numpy.float64)
+    xCoordinates = numpy.empty((1, numberOfLat), dtype=numpy.float64)
     yCoordinates = numpy.empty((1, numberOfLon), dtype=numpy.float64)
     minX = minY = maxX = maxY = None
 
-    for index in range(0, numberOfLat):  
+    for index in range(0, numberOfLat):
+        
+        # 2017-11-15 
+        # Convert from 
+        # Convert an UTM coordinate into a (latitude, longitude) tuple:
+        # utm.to_latlon(340000, 5710000, 32, 'U')
+        # >>> (51.51852098408468, 6.693872395145327)
+        # The syntax is utm.to_latlon(EASTING, NORTHING, ZONE NUMBER, ZONE LETTER).
+        # The return has the form (LATITUDE, LONGITUDE).
+        # Note that we use an offset for Vancouver Harbour area 
+        latlon = utm.to_latlon(dx + lonc[index], dy + latc[index], 10, 'U')   
+        latitude = latlon[0]
+        longitude = latlon[1]
+        
+        # Old code - when conversion not required from UTM to Lat/Lon
+        # latitude = latc[index]
+        # longitude = lonc[index]    
 
-        latitude = latc[index]
-        longitude = lonc[index]    
-
-        #Keep track of the data extents so we can update the metadata.
+        # Keep track of the data extents so we can update the metadata.
         if minX == None:
             minX = maxX = longitude
             minY = maxY = latitude
@@ -44,16 +61,16 @@ def create_xy_group(hdf_file, latc, lonc):
             minY = min(minY, latitude)
             maxY = max(maxY, latitude)
 
-        xCoordinates[0,index] = longitude
-        yCoordinates[0,index] = latitude
+        xCoordinates[0, index] = longitude
+        yCoordinates[0, index] = latitude
 
 
-    #Add the 'Group XY' to store the position information.
+    # Add the 'Group XY' to store the position information.
     groupName = 'Group XY'
     print("Creating", groupName, "dataset.")
     xy_group = hdf_file.create_group(groupName)
 
-    #Add the x and y datasets to the xy group.
+    # Add the x and y datasets to the xy group.
     xy_group.create_dataset('X', (1, numberOfLat), dtype=numpy.float64, data=xCoordinates)
     xy_group.create_dataset('Y', (1, numberOfLon), dtype=numpy.float64, data=yCoordinates)       
 
@@ -82,7 +99,7 @@ def create_direction_speed(group, ua, va):
         v_ms = va[index]
         u_ms = ua[index]
 
-        #Convert from metres per second to knots
+        # Convert from metres per second to knots
         v_knot = v_ms * ms2Knots
         u_knot = u_ms * ms2Knots
 
@@ -91,12 +108,12 @@ def create_direction_speed(group, ua, va):
         windDirectionDegrees = math.degrees(windDirectionRadians)
         windDirectionNorth = 90.0 - windDirectionDegrees
 
-        #The direction must always be positive.
+        # The direction must always be positive.
         if windDirectionNorth < 0.0:
             windDirectionNorth += 360.0
 
-        directions[0,index] = windDirectionNorth
-        speeds[0,index] = windSpeed
+        directions[0, index] = windDirectionNorth
+        speeds[0, index] = windSpeed
 
         if min_speed == None:
             min_speed = max_speed = windSpeed
@@ -104,7 +121,7 @@ def create_direction_speed(group, ua, va):
             min_speed = min(min_speed, windSpeed)
             max_speed = max(max_speed, windSpeed)
 
-    #Create the datasets.
+    # Create the datasets.
     direction_dataset = group.create_dataset('Direction', (1, numberOfVaValues), dtype=numpy.float64, data=directions)
     speed_dataset = group.create_dataset('Speed', (1, numberOfVaValues), dtype=numpy.float64, data=speeds)
 
@@ -136,12 +153,12 @@ def create_data_groups(hdf_file, times, ua, va):
         groupTitle = 'Irregular Grid at DateTime ' + str(index + 1)
         newGroup.attrs.create('Title', groupTitle.encode())
 
-        #Store the start time.
+        # Store the start time.
         strVal = times[index].tostring().decode()
         timeVal = iso8601.parse_date(strVal)
         timeVal = timeVal.astimezone(pytz.utc)
 
-        #Keep track of the min/max time so we can update the metadata
+        # Keep track of the min/max time so we can update the metadata
         if minTime == None:
             minTime = maxTime = timeVal
         else:
@@ -153,7 +170,7 @@ def create_data_groups(hdf_file, times, ua, va):
 
         groupMinSpeed, groupMaxSpeed = create_direction_speed(newGroup, ua[index], va[index])
 
-        #Keep track of the min/max speed so we can update the metadata
+        # Keep track of the min/max speed so we can update the metadata
         if minSpeed == None:
             minSpeed = groupMinSpeed
             maxSpeed = groupMaxSpeed
@@ -161,7 +178,7 @@ def create_data_groups(hdf_file, times, ua, va):
             minSpeed = min(minSpeed, groupMinSpeed)
             maxSpeed = max(maxSpeed, groupMaxSpeed)
 
-    #Figure out what the interval is between the times (use only the first)
+    # Figure out what the interval is between the times (use only the first)
     if numberOfTimes > 1:
 
         strVal = times[0].tostring().decode()
@@ -195,33 +212,33 @@ def update_metadata(hdf_file, numberOfTimes, numberOfValues, minTime, maxTime, i
     :param maxSpeed: The maximum surface speed of the source data.
     """
 
-    #Set the correct coding format.
+    # Set the correct coding format.
     hdf_file.attrs.create('dataCodingFormat', 3, dtype=numpy.int64)
 
-    #Set the number of times.
+    # Set the number of times.
     hdf_file.attrs.create('numberOfTimes', numberOfTimes, dtype=numpy.int64)
 
-    #Set the number of nodes.
+    # Set the number of nodes.
     hdf_file.attrs.create('numberOfNodes', numberOfValues, dtype=numpy.int64)
     
-    #Set the time interval (if we have one)
+    # Set the time interval (if we have one)
     if interval != None:
         intervalInSeconds = interval.total_seconds()
         hdf_file.attrs.create('timeRecordInterval', intervalInSeconds, dtype=numpy.int64)
 
-    #Update the temporal extents in the metadata.
+    # Update the temporal extents in the metadata.
     strVal = minTime.strftime("%Y%m%dT%H%M%SZ")
     hdf_file.attrs.create('dateTimeOfFirstRecord', strVal.encode())
     strVal = maxTime.strftime("%Y%m%dT%H%M%SZ")
     hdf_file.attrs.create('dateTimeOfLastRecord', strVal.encode())
 
-    #Update the geo coverage in the metadata. (These are not set anymore... since 1.09)
-    #hdf_file.attrs.create('westBoundLongitude', minX, dtype=numpy.float64)
-    #hdf_file.attrs.create('eastBoundLongitude', maxX, dtype=numpy.float64)
-    #hdf_file.attrs.create('southBoundLatitude', minY, dtype=numpy.float64)
-    #hdf_file.attrs.create('northBoundLatitude', maxY, dtype=numpy.float64)
+    # Update the geo coverage in the metadata. (These are not set anymore... since 1.09)
+    # hdf_file.attrs.create('westBoundLongitude', minX, dtype=numpy.float64)
+    # hdf_file.attrs.create('eastBoundLongitude', maxX, dtype=numpy.float64)
+    # hdf_file.attrs.create('southBoundLatitude', minY, dtype=numpy.float64)
+    # hdf_file.attrs.create('northBoundLatitude', maxY, dtype=numpy.float64)
 
-    #Update the surface speed values.
+    # Update the surface speed values.
     if 'minSurfCurrentSpeed' in hdf_file.attrs:
         minSpeed = min(minSpeed, hdf_file.attrs['minSurfCurrentSpeed'])
 
@@ -250,33 +267,36 @@ def create_command_line():
 #******************************************************************************        
 def main():
 
-    #Create the command line parser.
+    # Create the command line parser.
     parser = create_command_line()
 
-    #Parse the command line.
+    # Parse the command line.
     results = parser.parse_args()
     
-    #open the HDF5 file.
+    # open the HDF5 file.
     with h5py.File(results.inOutFile[0], "r+") as hdf_file:
 
-        #Open the grid file.
+        # Open the grid file.
         with netCDF4.Dataset(results.grid_file, "r", format="NETCDF4") as grid_file:
 
-            #Grab the data that we need.
+            # Grab the data that we need.
             times = grid_file.variables['Times']
             ua = grid_file.variables['ua']
-            va = grid_file.variables['va']        
-            latc = grid_file.variables['latc']
-            lonc = grid_file.variables['lonc']
+            va = grid_file.variables['va']
+            
+            # 2017-11-15 Changed this from latc/lonc to yc/xc
+            # as in the Van Harbour model, latc and lonc were not populated              
+            latc = grid_file.variables['yc']
+            lonc = grid_file.variables['xc']
 
-            #Verify that these arrays are the same size.
+            # Verify that these arrays are the same size.
             numberOfTimes = times.shape[0]
             numberOfVaSeries = va.shape[0]
             numberOfUaSeries = ua.shape[0]
             if numberOfTimes != numberOfVaSeries or numberOfTimes != numberOfUaSeries:
                 raise Exception('The number of time values does not match the number of speed and distance values.')
 
-            #Verify that these arrays are the same size.
+            # Verify that these arrays are the same size.
             numberOfLat = latc.shape[0]
             numberOfLon = lonc.shape[0]
             numberOfVaValues = va.shape[1]
@@ -286,7 +306,7 @@ def main():
             elif numberOfLat != numberOfVaValues or numberOfLat != numberOfUaValues:
                 raise Exception('The number of positions does not match the number of speed and distance values.')
 
-            #Verify that the input data is in the correct units.
+            # Verify that the input data is in the correct units.
             vaUnits = va.getncattr('units')
             uaUnits = ua.getncattr('units')
             if vaUnits != uaUnits and vaUnits != 'metres s-1':
@@ -296,20 +316,20 @@ def main():
             print("Number of timestamps in source file:", numberOfTimes)
             print("Number of records for each timestamp:", numberOfLat)
 
-            #Add the 'Group XY' to store the position information.
+            # Add the 'Group XY' to store the position information.
             minX, minY, maxX, maxY = create_xy_group(hdf_file, latc, lonc)
     
-            #Add all of the groups
+            # Add all of the groups
             minTime, maxTime, interval, minSpeed, maxSpeed = create_data_groups(hdf_file, times, ua, va)
 
-            #Update the s-111 file's metadata
+            # Update the s-111 file's metadata
             update_metadata(hdf_file, numberOfTimes, numberOfVaValues,
                             minTime, maxTime, interval, minX, minY, maxX, maxY,
                             minSpeed, maxSpeed)
 
             print("Dataset successfully added")
 
-        #Flush any edits out.
+        # Flush any edits out.
         hdf_file.flush()
 
 
